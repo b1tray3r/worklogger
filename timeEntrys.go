@@ -6,6 +6,7 @@ import (
 	"io"
 	"os"
 	"os/exec"
+	"regexp"
 	"strings"
 	"time"
 
@@ -61,18 +62,27 @@ func (el *EntryList) fromJSON(data []byte) error {
 		isJira := false
 
 		tags := []string{}
-		for _, t := range entry.Tags {
-			prefix := t[:2]
-			issueID := t[2:]
+		rexp := regexp.MustCompile(`[RJ]_\w+`)
 
-			switch prefix {
-			case "J_":
-				tags = append(tags, "PIM-"+issueID)
-				isJira = true
-			case "R_":
-				tags = append(tags, issueID)
-				isRedmine = true
-			default:
+		for _, t := range entry.Tags {
+			matches := rexp.FindAllString(t, -1)
+			for _, match := range matches {
+				prefix := match[:2]
+				issueID := match[2:]
+				switch prefix {
+				case "J_":
+					tags = append(tags, "PIM-"+issueID)
+					isJira = true
+				case "R_":
+					tags = append(tags, issueID)
+					isRedmine = true
+				}
+				if match == t {
+					t = ""
+				}
+			}
+
+			if t != "" {
 				comment = append(comment, t)
 			}
 		}
