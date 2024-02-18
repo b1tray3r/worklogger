@@ -5,17 +5,22 @@ import (
 	"log"
 	"os"
 
+	"github.com/joho/godotenv"
 	"github.com/urfave/cli"
 )
 
 var (
 	el EntryList
+	jl JiraLogger
 )
 
 func main() {
+	err := godotenv.Load()
+	if err != nil {
+		log.Fatal("Error loading .env file")
+	}
+
 	el := EntryList{}
-	rl := RedmineLogger{}
-	jl := JiraLogger{}
 
 	app := &cli.App{
 		Name:  "worklogger",
@@ -52,6 +57,31 @@ func main() {
 				Usage: "Get the time entries from timewarrior and log them to other systems.",
 				Flags: []cli.Flag{
 					&cli.StringFlag{
+						Name:  "redmine-api-token",
+						Usage: "The API key for Redmine.",
+						Value: os.Getenv("WL_REDMINE_API_TOKEN"),
+					},
+					&cli.StringFlag{
+						Name:  "redmine-url",
+						Usage: "The URL for Redmine.",
+						Value: os.Getenv("WL_REDMINE_URL"),
+					},
+					&cli.StringFlag{
+						Name:  "jira-username",
+						Usage: "The username for JIRA.",
+						Value: os.Getenv("WL_JIRA_USERNAME"),
+					},
+					&cli.StringFlag{
+						Name:  "jira-api-token",
+						Usage: "The API token for JIRA.",
+						Value: os.Getenv("WL_JIRA_API_TOKEN"),
+					},
+					&cli.StringFlag{
+						Name:  "jira-url",
+						Usage: "The URL for JIRA.",
+						Value: os.Getenv("WL_JIRA_URL"),
+					},
+					&cli.StringFlag{
 						Name:  "range",
 						Value: "month",
 						Usage: "The time range to list. Valid ranges are 'month', 'week', and 'day'.",
@@ -63,8 +93,21 @@ func main() {
 						Name: "not-jira",
 					},
 				},
-				Action: func(cCtx *cli.Context) error {
-					time_range := cCtx.String("range")
+				Action: func(ctx *cli.Context) error {
+					log.Printf("%v", ctx.String("jira-url"))
+					rl := RedmineLogger{
+						APIKey:       ctx.String("redmine-api-token"),
+						URL:          ctx.String("redmine-url"),
+						TicketPrefix: "",
+					}
+					jl := JiraLogger{
+						Username:     ctx.String("jira-username"),
+						Password:     ctx.String("jira-api-token"),
+						URL:          ctx.String("jira-url"),
+						TicketPrefix: "PIM-",
+					}
+
+					time_range := ctx.String("range")
 					if time_range != "month" && time_range != "week" && time_range != "day" {
 						fmt.Println("Invalid time range. Please use 'month', 'week', or 'day'.")
 					}
@@ -74,9 +117,9 @@ func main() {
 					}
 
 					for _, entry := range el.Entries {
-						log.Printf("Logging entry: %s", entry.Comment)
+						// log.Printf("Logging entry: %s", entry.Comment)
 
-						if entry.IsRedmine && !cCtx.Bool("not-redmine") {
+						if entry.IsRedmine && !ctx.Bool("not-redmine") {
 							success, err := rl.Check(entry)
 							if err != nil {
 								return err
@@ -87,19 +130,17 @@ func main() {
 							}
 						}
 
-						if entry.IsJira && !cCtx.Bool("not-jira") {
+						if entry.IsJira && !ctx.Bool("not-jira") {
 							success, err := jl.Check(entry)
 							if err != nil {
 								return err
 							}
 
 							if success {
-								log.Println("to Jira:")
+								log.Println("\nto Jira:\n")
 								jl.Log(entry)
 							}
 						}
-
-						fmt.Println(entry)
 					}
 
 					return nil
