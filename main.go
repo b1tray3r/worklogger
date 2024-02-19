@@ -137,7 +137,7 @@ func main() {
 							}
 
 							if success {
-								log.Println("\nto Jira:\n")
+								log.Println("\nto Jira:")
 								jl.Log(entry)
 							}
 						}

@@ -1,8 +1,13 @@
 package main
 
 import (
+	"bytes"
 	"context"
+	"encoding/json"
 	"fmt"
+	"log"
+	"net/http"
+	"net/url"
 
 	jira "github.com/andygrunwald/go-jira/v2/onpremise"
 )
@@ -100,5 +105,73 @@ func (jl JiraLogger) Check(te TimeEntry) (bool, error) {
 }
 
 func (jl JiraLogger) Log(te TimeEntry) error {
+	log.Printf("%s", te.IssueIDs[0])
+	client, err := jl.getJiraClient()
+	if err != nil {
+		return err
+	}
+
+	issueID, err := jl.getIssueID(te.IssueIDs)
+	if err != nil {
+		return err
+	}
+
+	issue, err := jl.getIssue(client, issueID)
+	if err != nil {
+		return err
+	}
+
+	var wl struct {
+		ID              string `json:"id"`
+		StartDate       string `json:"startDate"`
+		TimeLogged      string `json:"timeLogged"`
+		LogworkCategory string `json:"logworkCategory"`
+		Comment         string `json:"comment"`
+	}
+
+	wl.ID = issue.ID
+	wl.StartDate = te.Start.Format("02/Jan/06 03:04 PM")
+	wl.TimeLogged = fmt.Sprintf("%.2f", te.Hours.Hours())
+	wl.LogworkCategory = "cat1"
+	wl.Comment = te.Comment
+
+	workLog := url.Values{
+		"id":              {wl.ID},
+		"startDate":       {wl.StartDate},
+		"timeLogged":      {wl.TimeLogged},
+		"logworkCategory": {wl.LogworkCategory},
+		"comment":         {wl.Comment},
+	}
+
+	urlStr := jl.URL + "/secure/CreateWorklog.jspa?"
+
+	data := workLog.Encode()
+	urlStr += data
+
+	jsonData, err := json.Marshal(wl)
+	if err != nil {
+		return err
+	}
+
+	req, err := http.NewRequest("POST", urlStr, bytes.NewBuffer(jsonData))
+	if err != nil {
+		return err
+	}
+
+	log.Println(req.URL.String())
+	log.Printf("%s", req.Body)
+	req.Header.Set("Content-Type", "application/json")
+	resp, err := http.DefaultClient.Do(req)
+	if err != nil {
+		return err
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != 200 {
+		return fmt.Errorf("could not log work")
+	}
+
+	log.Printf("Response: %v", resp.Body)
+
 	return nil
 }
