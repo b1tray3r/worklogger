@@ -8,6 +8,7 @@ import (
 	"log"
 	"net/http"
 	"net/url"
+	"time"
 
 	jira "github.com/andygrunwald/go-jira/v2/onpremise"
 )
@@ -17,10 +18,15 @@ type TimeLogger interface {
 	Log(TimeEntry) error
 }
 
+type Logger struct {
+	LoggerType string
+}
+
 type RedmineLogger struct {
 	APIKey       string
 	URL          string
 	TicketPrefix string
+	Logger       Logger
 }
 
 func (rl RedmineLogger) Check(te TimeEntry) (bool, error) {
@@ -36,6 +42,7 @@ type JiraLogger struct {
 	Password     string
 	URL          string
 	TicketPrefix string
+	Logger       Logger
 }
 
 func (jl JiraLogger) getJiraClient() (*jira.Client, error) {
@@ -158,9 +165,11 @@ func (jl JiraLogger) Log(te TimeEntry) error {
 		return err
 	}
 
-	log.Println(req.URL.String())
-	log.Printf("%s", req.Body)
 	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("Accept", "*/*")
+	req.Header.Set("X-Atlassian-Token", "no-check")
+	req.Header.Set("Authorization", "Bearer "+jl.Password)
+
 	resp, err := http.DefaultClient.Do(req)
 	if err != nil {
 		return err
@@ -171,7 +180,8 @@ func (jl JiraLogger) Log(te TimeEntry) error {
 		return fmt.Errorf("could not log work")
 	}
 
-	log.Printf("Response: %v", resp.Body)
+	marker := fmt.Sprintf("Synced2J-%s", time.Now().Format("20060102150405"))
+	te.markSynced(marker)
 
 	return nil
 }

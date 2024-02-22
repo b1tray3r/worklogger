@@ -3,6 +3,7 @@ package main
 import (
 	"encoding/json"
 	"regexp"
+	"strconv"
 	"strings"
 	"time"
 )
@@ -84,7 +85,10 @@ func (el *EntryList) fromJSON(data []byte) error {
 			return err
 		}
 
+		id := strconv.Itoa(entry.ID)
+
 		te := TimeEntry{
+			ID:        id,
 			IssueIDs:  tags,
 			Start:     startTime,
 			End:       endTime,
