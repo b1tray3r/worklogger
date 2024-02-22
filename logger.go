@@ -8,7 +8,6 @@ import (
 	"log"
 	"net/http"
 	"net/url"
-	"time"
 
 	jira "github.com/andygrunwald/go-jira/v2/onpremise"
 )
@@ -108,11 +107,17 @@ func (jl JiraLogger) Check(te TimeEntry) (bool, error) {
 		return false, nil
 	}
 
+	for _, tag := range te.Tags {
+		if tag == "S2J" {
+			return false, nil
+		}
+	}
+
 	return true, nil
 }
 
 func (jl JiraLogger) Log(te TimeEntry) error {
-	log.Printf("%s", te.IssueIDs[0])
+	log.Printf("Logging time entry to Jira: %v", te)
 	client, err := jl.getJiraClient()
 	if err != nil {
 		return err
@@ -180,8 +185,7 @@ func (jl JiraLogger) Log(te TimeEntry) error {
 		return fmt.Errorf("could not log work")
 	}
 
-	marker := fmt.Sprintf("Synced2J-%s", time.Now().Format("20060102150405"))
-	te.markSynced(marker)
+	te.markSynced("S2J")
 
 	return nil
 }

@@ -58,7 +58,7 @@ func (el *EntryList) list() {
 		table.Append([]string{entry.ID, entry.Start.Format("2006-01-02 15:04:05"), entry.End.Format("2006-01-02 15:04:05"), fmt.Sprintf("%.2f", entry.Hours.Hours()), strings.Join(entry.IssueIDs, "\n"), entry.Comment})
 	}
 
-	table.SetFooter([]string{" ", "Total", "= " + fmt.Sprintf("%.2f", sum), " ", " "})
+	table.SetFooter([]string{" ", " ", "Total", "= " + fmt.Sprintf("%.2f", sum), " ", " "})
 
 	table.Render()
 }
