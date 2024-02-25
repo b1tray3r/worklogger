@@ -8,8 +8,11 @@ import (
 	"log"
 	"net/http"
 	"net/url"
+	"strconv"
+	"strings"
 
 	jira "github.com/andygrunwald/go-jira/v2/onpremise"
+	redmine "github.com/nixys/nxs-go-redmine/v5"
 )
 
 type TimeLogger interface {
@@ -17,19 +20,75 @@ type TimeLogger interface {
 	Log(TimeEntry) error
 }
 
-type Logger struct {
-	LoggerType string
-}
-
 type RedmineLogger struct {
 	APIKey       string
 	URL          string
 	TicketPrefix string
-	Logger       Logger
+	api          *redmine.Context
 }
 
-func (rl RedmineLogger) Check(te TimeEntry) (bool, error) {
-	return true, nil
+func (rl RedmineLogger) init() (*redmine.Context, error) {
+	if rl.URL == "" || rl.APIKey == "" {
+		return nil, fmt.Errorf("init error: make sure environment variables `REDMINE_HOST` and `REDMINE_API_KEY` are defined")
+	}
+
+	if rl.api == nil {
+		rl.api = redmine.Init(
+			redmine.Settings{
+				Endpoint: rl.URL,
+				APIKey:   rl.APIKey,
+			},
+		)
+	}
+
+	return rl.api, nil
+}
+
+func (rl RedmineLogger) getIssueID(issueIDs []string) (int64, error) {
+	log.Printf("issueIDs: %v", issueIDs)
+	log.Printf("rl.TicketPrefix: %v", rl.TicketPrefix)
+	for _, ID := range issueIDs {
+		if ID[:len(rl.TicketPrefix)] == rl.TicketPrefix {
+			ID = ID[len(rl.TicketPrefix):]
+
+			issueID, err := strconv.ParseInt(ID, 10, 64)
+			if err != nil {
+				return 0, err
+			}
+
+			return issueID, nil
+		}
+	}
+
+	return 0, nil
+}
+
+func (rl RedmineLogger) Check(te TimeEntry) error {
+	_, err := rl.init()
+	if err != nil {
+		return err
+	}
+	issueID, err := rl.getIssueID(te.IssueIDs)
+	if err != nil {
+		return err
+	}
+
+	found := ""
+	for _, tag := range te.Tags {
+		activity, present := strings.CutPrefix(tag, "A_")
+		if !present {
+			continue
+		}
+
+		found = activity
+	}
+
+	if found == "" {
+		iID := strconv.FormatInt(issueID, 10)
+		return fmt.Errorf("no activity found for time entry %s", iID)
+	}
+
+	return nil
 }
 
 func (rl RedmineLogger) Log(te TimeEntry) error {
@@ -41,7 +100,6 @@ type JiraLogger struct {
 	Password     string
 	URL          string
 	TicketPrefix string
-	Logger       Logger
 }
 
 func (jl JiraLogger) getJiraClient() (*jira.Client, error) {
@@ -105,12 +163,6 @@ func (jl JiraLogger) Check(te TimeEntry) (bool, error) {
 
 	if issue == nil {
 		return false, nil
-	}
-
-	for _, tag := range te.Tags {
-		if tag == "S2J" {
-			return false, nil
-		}
 	}
 
 	return true, nil
@@ -185,7 +237,7 @@ func (jl JiraLogger) Log(te TimeEntry) error {
 		return fmt.Errorf("could not log work")
 	}
 
-	te.markSynced("S2J")
+	te.mark("S2J")
 
 	return nil
 }

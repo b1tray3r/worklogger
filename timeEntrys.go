@@ -13,18 +13,31 @@ import (
 )
 
 type TimeEntry struct {
-	ID        string
-	IssueIDs  []string
-	Start     time.Time
-	End       time.Time
-	Hours     time.Duration
-	Tags      []string
-	Comment   string
-	IsRedmine bool
-	IsJira    bool
+	ID         string
+	IssueIDs   []string
+	Start      time.Time
+	End        time.Time
+	Hours      time.Duration
+	Tags       []string
+	Comment    string
+	ActivityID string
+	errors     []string
+	IsRedmine  bool
+	IsJira     bool
 }
 
-func (te *TimeEntry) markSynced(marker string) error {
+func (te *TimeEntry) unmark(marker string) error {
+	timewCommand := fmt.Sprintf("timew @%s untag %s", te.ID, marker)
+	timewOutput, err := exec.Command("bash", "-c", timewCommand).Output()
+	if err != nil {
+		return err
+	}
+
+	log.Printf("%s", timewOutput)
+	return nil
+}
+
+func (te *TimeEntry) mark(marker string) error {
 	timewCommand := fmt.Sprintf("timew @%s tag %s", te.ID, marker)
 	timewOutput, err := exec.Command("bash", "-c", timewCommand).Output()
 	if err != nil {
@@ -49,19 +62,57 @@ func (el *EntryList) fromTimeWarrior(time_range string) error {
 	return el.fromJSON(timewOutput)
 }
 
-func (el *EntryList) list() {
+func (el *EntryList) list() tablewriter.Table {
 	table := tablewriter.NewWriter(os.Stdout)
-	table.SetHeader([]string{"ID", "Start", "End", "Hours", "IssueIDs", "Comment", "Tags"})
+	table.SetHeader([]string{"ID", "Start", "End", "Hours", "IssueIDs", "Comment", "Tags", "Problems"})
 
 	sum := 0.0
 	for _, entry := range el.Entries {
+		// checking for problems
+		if len(entry.Comment) == 0 {
+			entry.errors = append(entry.errors, "Comment is empty")
+		}
+
+		if entry.IsJira && !entry.IsRedmine {
+			entry.errors = append(entry.errors, "Jira entry without Redmine issue")
+		}
+
+		if entry.IsRedmine && entry.IsJira && len(entry.IssueIDs) < 2 {
+			entry.errors = append(entry.errors, "Redmine and Jira issue without both issue IDs")
+		}
+
+		if entry.IsRedmine && entry.ActivityID == "" {
+			entry.errors = append(entry.errors, "Redmine entry without activity ID")
+		}
+
 		sum += entry.Hours.Hours()
-		table.Append([]string{entry.ID, entry.Start.Format("2006-01-02 15:04:05"), entry.End.Format("2006-01-02 15:04:05"), fmt.Sprintf("%.2f", entry.Hours.Hours()), strings.Join(entry.IssueIDs, "\n"), entry.Comment, strings.Join(entry.Tags, "\n")})
+		table.Append([]string{
+			entry.ID,
+			entry.Start.Format("2006-01-02 15:04:05"),
+			entry.End.Format("2006-01-02 15:04:05"),
+			fmt.Sprintf(
+				"%.2f",
+				entry.Hours.Hours(),
+			),
+			strings.Join(
+				entry.IssueIDs,
+				"\n",
+			),
+			entry.Comment,
+			strings.Join(
+				entry.Tags,
+				"\n",
+			),
+			strings.Join(
+				entry.errors,
+				"\n",
+			),
+		})
 	}
 
-	table.SetFooter([]string{" ", " ", "Total", "= " + fmt.Sprintf("%.2f", sum), " ", " ", " "})
+	table.SetFooter([]string{" ", " ", "Total", "= " + fmt.Sprintf("%.2f", sum), " ", " ", " ", " "})
 
-	table.Render()
+	return *table
 }
 
 func (el *EntryList) fromJSONFile(filename string) error {

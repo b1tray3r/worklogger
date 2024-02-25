@@ -9,7 +9,7 @@ import (
 )
 
 type TimeWarriorEntry struct {
-	ID    int
+	ID    int64
 	Start string
 	End   string
 	Tags  []string
@@ -42,7 +42,7 @@ func parse(entry TimeWarriorEntry) (*TimeEntry, error) {
 	}
 
 	if comment == "" {
-		comment = "⚠ No comment ⚠"
+		comment = ""
 	} else {
 		if strings.Contains(comment, ",") {
 			commentParts := strings.Split(comment, ",")
@@ -84,14 +84,14 @@ func parse(entry TimeWarriorEntry) (*TimeEntry, error) {
 				issueIDs = append(issueIDs, "PIM-"+issueID)
 			case "R_":
 				isRedmine = true
-				issueIDs = append(issueIDs, issueID)
+				issueIDs = append(issueIDs, "#"+issueID)
 			}
 		}
 	}
 
 	tags = tmp
 
-	id := strconv.Itoa(entry.ID)
+	id := strconv.FormatInt(entry.ID, 10)
 
 	return &TimeEntry{
 		ID:        id,
@@ -125,4 +125,24 @@ func (el *EntryList) fromJSON(data []byte) error {
 	}
 
 	return nil
+}
+
+func (el *EntryList) getRedmineEntries() []TimeEntry {
+	redmineEntries := []TimeEntry{}
+	for _, entry := range el.Entries {
+		if entry.IsRedmine {
+			redmineEntries = append(redmineEntries, entry)
+		}
+	}
+	return redmineEntries
+}
+
+func (el *EntryList) getJiraEntries() []TimeEntry {
+	jiraEntries := []TimeEntry{}
+	for _, entry := range el.Entries {
+		if entry.IsJira {
+			jiraEntries = append(jiraEntries, entry)
+		}
+	}
+	return jiraEntries
 }
