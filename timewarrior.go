@@ -65,7 +65,8 @@ func parse(entry TimeWarriorEntry) (*TimeEntry, error) {
 
 	isJira := false
 	isRedmine := false
-	rexp := regexp.MustCompile(`[RJ]_\w+`)
+	rexp := regexp.MustCompile(`[RJA]_\w+`)
+	activityID := ""
 	issueIDs := []string{}
 	tmp := []string{}
 	for _, t := range tags {
@@ -85,6 +86,9 @@ func parse(entry TimeWarriorEntry) (*TimeEntry, error) {
 			case "R_":
 				isRedmine = true
 				issueIDs = append(issueIDs, "#"+issueID)
+			case "A_":
+				activityID = issueID
+				tmp = append(tmp, t)
 			}
 		}
 	}
@@ -94,15 +98,16 @@ func parse(entry TimeWarriorEntry) (*TimeEntry, error) {
 	id := strconv.FormatInt(entry.ID, 10)
 
 	return &TimeEntry{
-		ID:        id,
-		Comment:   comment,
-		IssueIDs:  issueIDs,
-		Start:     startTime,
-		End:       endTime,
-		Hours:     endTime.Sub(startTime),
-		Tags:      tags,
-		IsJira:    isJira,
-		IsRedmine: isRedmine,
+		ID:         id,
+		Comment:    comment,
+		IssueIDs:   issueIDs,
+		Start:      startTime,
+		End:        endTime,
+		Hours:      endTime.Sub(startTime),
+		Tags:       tags,
+		IsJira:     isJira,
+		IsRedmine:  isRedmine,
+		ActivityID: activityID,
 	}, nil
 }
 
