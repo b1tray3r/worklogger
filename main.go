@@ -51,16 +51,6 @@ func main() {
 					},
 				},
 				Action: func(ctx *cli.Context) error {
-					rl := &RedmineLogger{
-						APIKey:       ctx.String("redmine-api-token"),
-						URL:          ctx.String("redmine-url"),
-						TicketPrefix: "#",
-					}
-					_, err := rl.init()
-					if err != nil {
-						return err
-					}
-
 					time_range := ctx.String("range")
 					if time_range != "all" && time_range != "month" && time_range != "week" && time_range != "day" {
 						log.Println("Invalid time range. Please use 'all', 'month', 'week', or 'day'.")
@@ -167,7 +157,7 @@ func main() {
 								URL:          ctx.String("redmine-url"),
 								TicketPrefix: "#",
 							}
-							rc, err := rl.init()
+							api, err := rl.getApi()
 							if err != nil {
 								return err
 							}
@@ -183,6 +173,7 @@ func main() {
 
 							projects := &Projects{}
 							redmineEntries := []TimeEntry{}
+							mapping := map[string]string{}
 							for _, entry := range el.Entries {
 								if entry.IsRedmine {
 									redmineEntries = append(redmineEntries, entry)
@@ -191,68 +182,96 @@ func main() {
 										return err
 									}
 
-									issue, code, err := rc.IssueSingleGet(issueID, redmine.IssueSingleGetRequest{})
-									iID := strconv.FormatInt(issue.ID, 10)
+									iID := strconv.FormatInt(issueID, 10)
+									log.Printf("Checking %s against Redmine.", iID)
+
+									issue, code, err := api.IssueSingleGet(issueID, redmine.IssueSingleGetRequest{})
+									if code == 403 {
+										log.Printf("Access forbidden on %s: %d", iID, code)
+										continue
+									}
+									if code != 200 {
+										log.Printf("Unexpected code on %s: %d", iID, code)
+										continue
+									}
 									if err != nil {
 										log.Printf("Error getting issue %s: %s", iID, err)
 										continue
 									}
-									if code != 200 {
-										log.Printf("Error getting issue %s: %d", iID, code)
-										continue
-									}
 
-									pID := strconv.FormatInt(issue.Project.ID, 10)
-									rP, code, err := rc.ProjectSingleGet(
-										pID,
-										redmine.ProjectSingleGetRequest{
-											Includes: []redmine.ProjectInclude{redmine.ProjectIncludeTimeEntryActivities},
-										},
-									)
-									if err != nil {
-										log.Printf("Error getting project %s: %s", issue.Project.Name, err)
-										continue
-									}
-									if code != 200 {
-										log.Printf("Error getting project %s: %d", issue.Project.Name, code)
-										continue
-									}
+									// handle activities
+									if entry.ActivityID == "" {
+										if val, ok := mapping[iID]; ok {
+											entry.ActivityID = val
+										} else {
 
-									project := projects.GetProject(pID)
-									if project == nil {
-										project = &Project{
-											ID:         pID,
-											TimeEntrys: []TimeEntry{},
-											Activities: []Activity{},
+											log.Print("No activity ID found, asking the API for the activities...")
+											log.Printf("IssueID %s, Comment: %s", iID, entry.Comment)
+											pID := strconv.FormatInt(issue.Project.ID, 10)
+											rP, code, err := api.ProjectSingleGet(
+												pID,
+												redmine.ProjectSingleGetRequest{
+													Includes: []redmine.ProjectInclude{redmine.ProjectIncludeTimeEntryActivities},
+												},
+											)
+											if err != nil {
+												log.Printf("Error getting project %s: %s", issue.Project.Name, err)
+												continue
+											}
+											if code != 200 {
+												log.Printf("Error getting project %s: %d", issue.Project.Name, code)
+												continue
+											}
+
+											project := projects.GetProject(pID)
+											if project == nil {
+												project = &Project{
+													ID:         pID,
+													TimeEntrys: []TimeEntry{},
+													Activities: []Activity{},
+												}
+												project.TimeEntrys = append(project.TimeEntrys, entry)
+												projects.AddProject(*project)
+											}
+
+											if len(project.Activities) <= 0 {
+												for _, activity := range *rP.TimeEntryActivities {
+													project.Activities = append(project.Activities, Activity{
+														ID:  strconv.FormatInt(activity.ID, 10),
+														Tag: activity.Name,
+													})
+												}
+											}
+
+											log.Println("=====================================")
+											for index, activity := range project.Activities {
+												fmt.Printf("%d:\t%s\n", index, activity.Tag)
+											}
+											log.Println("=====================================")
+											var input string
+											fmt.Printf("Please enter the number of your activity: ")
+											fmt.Scanf("%s", &input)
+											selected, err := strconv.Atoi(input)
+											if err != nil {
+												return err
+											}
+
+											entry.ActivityID = project.Activities[selected].ID
+											mapping[iID] = entry.ActivityID
 										}
-										project.TimeEntrys = append(project.TimeEntrys, entry)
-										projects.AddProject(*project)
-									}
 
-									for _, activity := range *rP.TimeEntryActivities {
-										project.Activities = append(project.Activities, Activity{
-											ID:  strconv.FormatInt(activity.ID, 10),
-											Tag: activity.Name,
-										})
+										entry.mark(fmt.Sprintf("A_%s", entry.ActivityID))
 									}
 								}
 							}
 
-							log.Printf("Found %d Redmine entries", len(redmineEntries))
-							log.Printf("with %d Projects", len(projects.Projects))
-
 							for _, entry := range redmineEntries {
-								err := rl.Check(entry)
-								if err != nil {
-									return err
-								}
-
 								issueID, err := rl.getIssueID(entry.IssueIDs)
 								if err != nil {
 									return err
 								}
 								iID := strconv.FormatInt(issueID, 10)
-								log.Printf("Logging time entry to Redmine: %s", iID)
+								log.Printf("Logging %s", iID)
 
 								alreadySynced := false
 								for _, tag := range entry.Tags {
@@ -266,7 +285,10 @@ func main() {
 									continue
 								}
 
-								jl.Log(entry)
+								err = rl.Log(entry)
+								if err != nil {
+									return err
+								}
 							}
 
 							return nil
@@ -323,32 +345,25 @@ func main() {
 							log.Printf("Found %d JIRA entries", len(jiraEntries))
 
 							for _, entry := range jiraEntries {
-								success, err := jl.Check(entry)
+								issueID, err := jl.getIssueID(entry.IssueIDs)
 								if err != nil {
 									return err
 								}
+								log.Printf("Logging time entry to JIRA: %s", issueID)
 
-								if success {
-									issueID, err := jl.getIssueID(entry.IssueIDs)
-									if err != nil {
-										return err
+								alreadySynced := false
+								for _, tag := range entry.Tags {
+									if tag == "S2J" {
+										alreadySynced = true
+										break
 									}
-									log.Printf("Logging time entry to JIRA: %s", issueID)
-
-									alreadySynced := false
-									for _, tag := range entry.Tags {
-										if tag == "S2J" {
-											alreadySynced = true
-											break
-										}
-									}
-									if alreadySynced {
-										log.Println(">\tAlready synced to JIRA")
-										continue
-									}
-
-									jl.Log(entry)
 								}
+								if alreadySynced {
+									log.Println(">\tAlready synced to JIRA")
+									continue
+								}
+
+								jl.Log(entry)
 							}
 
 							return nil

@@ -5,18 +5,15 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"log"
 	"net/http"
 	"net/url"
 	"strconv"
-	"strings"
 
 	jira "github.com/andygrunwald/go-jira/v2/onpremise"
 	redmine "github.com/nixys/nxs-go-redmine/v5"
 )
 
 type TimeLogger interface {
-	Check(TimeEntry) (bool, error)
 	Log(TimeEntry) error
 }
 
@@ -24,29 +21,22 @@ type RedmineLogger struct {
 	APIKey       string
 	URL          string
 	TicketPrefix string
-	api          *redmine.Context
 }
 
-func (rl RedmineLogger) init() (*redmine.Context, error) {
+func (rl RedmineLogger) getApi() (*redmine.Context, error) {
 	if rl.URL == "" || rl.APIKey == "" {
 		return nil, fmt.Errorf("init error: make sure environment variables `REDMINE_HOST` and `REDMINE_API_KEY` are defined")
 	}
 
-	if rl.api == nil {
-		rl.api = redmine.Init(
-			redmine.Settings{
-				Endpoint: rl.URL,
-				APIKey:   rl.APIKey,
-			},
-		)
-	}
-
-	return rl.api, nil
+	return redmine.Init(
+		redmine.Settings{
+			Endpoint: rl.URL,
+			APIKey:   rl.APIKey,
+		},
+	), nil
 }
 
 func (rl RedmineLogger) getIssueID(issueIDs []string) (int64, error) {
-	log.Printf("issueIDs: %v", issueIDs)
-	log.Printf("rl.TicketPrefix: %v", rl.TicketPrefix)
 	for _, ID := range issueIDs {
 		if ID[:len(rl.TicketPrefix)] == rl.TicketPrefix {
 			ID = ID[len(rl.TicketPrefix):]
@@ -63,35 +53,48 @@ func (rl RedmineLogger) getIssueID(issueIDs []string) (int64, error) {
 	return 0, nil
 }
 
-func (rl RedmineLogger) Check(te TimeEntry) error {
-	_, err := rl.init()
-	if err != nil {
-		return err
-	}
-	issueID, err := rl.getIssueID(te.IssueIDs)
-	if err != nil {
-		return err
-	}
-
-	found := ""
-	for _, tag := range te.Tags {
-		activity, present := strings.CutPrefix(tag, "A_")
-		if !present {
-			continue
-		}
-
-		found = activity
-	}
-
-	if found == "" {
-		iID := strconv.FormatInt(issueID, 10)
-		return fmt.Errorf("no activity found for time entry %s", iID)
-	}
-
-	return nil
-}
-
 func (rl RedmineLogger) Log(te TimeEntry) error {
+	ID, err := rl.getIssueID(te.IssueIDs)
+	if err != nil {
+		return err
+	}
+
+	issueID := int64(ID)
+
+	AID := te.ActivityID
+	activityID, err := strconv.ParseInt(AID, 10, 64)
+	if err != nil {
+		return err
+	}
+
+	api, err := rl.getApi()
+	if err != nil {
+		return err
+	}
+	cte, code, err := api.TimeEntryCreate(
+		redmine.TimeEntryCreate{
+			TimeEntry: redmine.TimeEntryCreateObject{
+				IssueID:    &issueID,
+				ActivityID: activityID,
+				Hours:      te.Hours.Hours(),
+				Comments:   te.Comment,
+			},
+		},
+	)
+	if err != nil {
+		return err
+	}
+	if code != http.StatusCreated {
+		return fmt.Errorf("could not log time entry")
+	}
+
+	fmt.Println(cte)
+	fmt.Println(code)
+
+	if code == http.StatusCreated {
+		te.mark("S2R")
+	}
+
 	return nil
 }
 
@@ -145,31 +148,7 @@ func (jl JiraLogger) getIssue(client *jira.Client, issueID string) (*jira.Issue,
 	return issue, nil
 }
 
-func (jl JiraLogger) Check(te TimeEntry) (bool, error) {
-	client, err := jl.getJiraClient()
-	if err != nil {
-		return false, err
-	}
-
-	issueID, err := jl.getIssueID(te.IssueIDs)
-	if err != nil {
-		return false, err
-	}
-
-	issue, err := jl.getIssue(client, issueID)
-	if err != nil {
-		return false, err
-	}
-
-	if issue == nil {
-		return false, nil
-	}
-
-	return true, nil
-}
-
 func (jl JiraLogger) Log(te TimeEntry) error {
-	log.Printf("Logging time entry to Jira: %v", te)
 	client, err := jl.getJiraClient()
 	if err != nil {
 		return err
