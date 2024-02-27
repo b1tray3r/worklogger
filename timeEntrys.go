@@ -65,15 +65,21 @@ func (el *EntryList) fromTimeWarrior(time_range string) error {
 func (el *EntryList) filterPending() {
 	var filtered []TimeEntry
 	for _, entry := range el.Entries {
-		foundSyncedTag := false
+		syncFlags := []string{}
 		for _, tag := range entry.Tags {
-			if tag == "S2R" {
-				foundSyncedTag = true
+			if tag == "S2R" || tag == "S2J" {
+				syncFlags = append(syncFlags, tag)
 			}
 		}
-		if !foundSyncedTag {
+
+		if entry.IsRedmine && entry.IsJira && len(syncFlags) < 2 {
 			filtered = append(filtered, entry)
 		}
+
+		if entry.IsRedmine && len(syncFlags) == 0 {
+			filtered = append(filtered, entry)
+		}
+
 	}
 	el.Entries = filtered
 }
