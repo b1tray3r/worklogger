@@ -178,6 +178,16 @@ func main() {
 								return err
 							}
 
+							user, code, err := api.UserCurrentGet(redmine.UserCurrentGetRequest{})
+							if code != 200 {
+								return fmt.Errorf("error getting user: %d", code)
+							}
+							if err != nil {
+								return fmt.Errorf("error getting user: %s", err)
+							}
+
+							log.Printf("Logged in as %s", user.Login)
+
 							time_range := ctx.String("range")
 							if time_range != "month" && time_range != "week" && time_range != "day" {
 								fmt.Println("Invalid time range. Please use 'month', 'week', or 'day'.")
