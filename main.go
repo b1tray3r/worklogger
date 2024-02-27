@@ -6,6 +6,7 @@ import (
 	"os"
 	"strconv"
 
+	"github.com/adrg/xdg"
 	"github.com/joho/godotenv"
 	redmine "github.com/nixys/nxs-go-redmine/v5"
 	"github.com/urfave/cli"
@@ -18,7 +19,11 @@ var (
 )
 
 func main() {
-	err := godotenv.Load()
+	configFile, err := xdg.ConfigFile("worklogger/config.env")
+	if err != nil {
+		log.Fatal("Error getting config file")
+	}
+	err = godotenv.Load(configFile)
 	if err != nil {
 		log.Fatal("Error loading .env file")
 	}

@@ -3,6 +3,7 @@ module aborgardt.me
 go 1.21.6
 
 require (
+	github.com/adrg/xdg v0.4.0
 	github.com/andygrunwald/go-jira/v2 v2.0.0-20240116150243-50d59fe116d6
 	github.com/joho/godotenv v1.5.1
 	github.com/nixys/nxs-go-redmine/v5 v5.1.0
@@ -19,4 +20,5 @@ require (
 	github.com/mitchellh/mapstructure v1.3.3 // indirect
 	github.com/russross/blackfriday/v2 v2.1.0 // indirect
 	github.com/trivago/tgo v1.0.7 // indirect
+	golang.org/x/sys v0.6.0 // indirect
 )
