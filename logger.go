@@ -71,12 +71,16 @@ func (rl RedmineLogger) Log(te TimeEntry) error {
 	if err != nil {
 		return err
 	}
+
+	date := te.Start.Format("2006-01-02")
+
 	cte, code, err := api.TimeEntryCreate(
 		redmine.TimeEntryCreate{
 			TimeEntry: redmine.TimeEntryCreateObject{
 				IssueID:    &issueID,
 				ActivityID: activityID,
 				Hours:      te.Hours.Hours(),
+				SpentOn:    &date,
 				Comments:   te.Comment,
 			},
 		},

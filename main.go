@@ -49,6 +49,10 @@ func main() {
 						Value: "all",
 						Usage: "The time range to list. Valid ranges are 'all', 'month', 'week', and 'day'.",
 					},
+					&cli.BoolFlag{
+						Name:  "pending",
+						Usage: "Show time entries which are not yet synced to Redmine or JIRA.",
+					},
 				},
 				Action: func(ctx *cli.Context) error {
 					time_range := ctx.String("range")
@@ -59,6 +63,10 @@ func main() {
 
 					if err := el.fromTimeWarrior(time_range); err != nil {
 						return err
+					}
+
+					if ctx.Bool("pending") {
+						el.filterPending()
 					}
 
 					table := el.list()
@@ -85,10 +93,18 @@ func main() {
 						return err
 					}
 
+					tag := ctx.String("tag")
+					ID := ctx.String("issueID")
+
 					for _, entry := range el.Entries {
+						if ID == "*" {
+							entry.unmark(tag)
+							continue
+						}
+
 						for _, issueID := range entry.IssueIDs {
-							if issueID == ctx.String("issueID") {
-								entry.unmark(ctx.String("tag"))
+							if issueID == ID {
+								entry.unmark(tag)
 							}
 						}
 					}
@@ -176,7 +192,6 @@ func main() {
 							mapping := map[string]string{}
 							for _, entry := range el.Entries {
 								if entry.IsRedmine {
-									redmineEntries = append(redmineEntries, entry)
 									issueID, err := rl.getIssueID(entry.IssueIDs)
 									if err != nil {
 										return err
@@ -187,14 +202,17 @@ func main() {
 
 									issue, code, err := api.IssueSingleGet(issueID, redmine.IssueSingleGetRequest{})
 									if code == 403 {
+										entry.errors = append(entry.errors, fmt.Sprintf("Access forbidden on %s: %d", iID, code))
 										log.Printf("Access forbidden on %s: %d", iID, code)
 										continue
 									}
 									if code != 200 {
+										entry.errors = append(entry.errors, fmt.Sprintf("Unexpected code on %s: %d", iID, code))
 										log.Printf("Unexpected code on %s: %d", iID, code)
 										continue
 									}
 									if err != nil {
+										entry.errors = append(entry.errors, fmt.Sprintf("Error getting issue %s: %s", iID, err))
 										log.Printf("Error getting issue %s: %s", iID, err)
 										continue
 									}
@@ -262,6 +280,8 @@ func main() {
 
 										entry.mark(fmt.Sprintf("A_%s", entry.ActivityID))
 									}
+
+									redmineEntries = append(redmineEntries, entry)
 								}
 							}
 
@@ -282,6 +302,11 @@ func main() {
 								}
 								if alreadySynced {
 									log.Println(">\tAlready synced to Redmine")
+									continue
+								}
+
+								if len(entry.errors) > 0 {
+									log.Println(">\tSkipping due to errors")
 									continue
 								}
 

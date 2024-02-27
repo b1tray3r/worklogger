@@ -62,6 +62,22 @@ func (el *EntryList) fromTimeWarrior(time_range string) error {
 	return el.fromJSON(timewOutput)
 }
 
+func (el *EntryList) filterPending() {
+	var filtered []TimeEntry
+	for _, entry := range el.Entries {
+		foundSyncedTag := false
+		for _, tag := range entry.Tags {
+			if tag == "S2R" {
+				foundSyncedTag = true
+			}
+		}
+		if !foundSyncedTag {
+			filtered = append(filtered, entry)
+		}
+	}
+	el.Entries = filtered
+}
+
 func (el *EntryList) list() tablewriter.Table {
 	table := tablewriter.NewWriter(os.Stdout)
 	table.SetHeader([]string{"ID", "Start", "End", "Hours", "IssueIDs", "Comment", "Tags", "Problems"})
