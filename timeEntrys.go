@@ -107,11 +107,13 @@ func (el *EntryList) list() tablewriter.Table {
 			entry.errors = append(entry.errors, "Redmine entry without activity ID")
 		}
 
+		loc, _ := time.LoadLocation("Europe/Berlin")
+
 		sum += entry.Hours.Hours()
 		table.Append([]string{
 			entry.ID,
-			entry.Start.Format("2006-01-02 15:04:05"),
-			entry.End.Format("2006-01-02 15:04:05"),
+			entry.Start.In(loc).Format("2006-01-02 15:04:05"),
+			entry.End.In(loc).Format("2006-01-02 15:04:05"),
 			fmt.Sprintf(
 				"%.2f",
 				entry.Hours.Hours(),
