@@ -89,7 +89,19 @@ func (el *EntryList) list() tablewriter.Table {
 	table.SetHeader([]string{"ID", "Start", "End", "Hours", "IssueIDs", "Comment", "Tags", "Problems"})
 
 	sum := 0.0
+	sum4day := 0.0
+	currentDay := ""
 	for _, entry := range el.Entries {
+		if currentDay == "" {
+			currentDay = entry.Start.Format("2006-01-02")
+		}
+
+		if currentDay != entry.Start.Format("2006-01-02") {
+			table.Append([]string{" ", " ", currentDay, "= " + fmt.Sprintf("%.2f", sum4day), " ", " ", " ", " "})
+			sum4day = 0.0
+			currentDay = entry.Start.Format("2006-01-02")
+		}
+
 		// checking for problems
 		if len(entry.Comment) == 0 {
 			entry.errors = append(entry.errors, "Comment is empty")
@@ -109,6 +121,7 @@ func (el *EntryList) list() tablewriter.Table {
 
 		loc, _ := time.LoadLocation("Europe/Berlin")
 
+		sum4day += entry.Hours.Hours()
 		sum += entry.Hours.Hours()
 		table.Append([]string{
 			entry.ID,
