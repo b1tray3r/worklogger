@@ -4,11 +4,13 @@ import (
 	"fmt"
 	"io"
 	"log"
+	"net/http"
 	"os"
 	"os/exec"
 	"strings"
 	"time"
 
+	"github.com/PuloV/ics-golang"
 	"github.com/olekukonko/tablewriter"
 )
 
@@ -50,6 +52,67 @@ func (te *TimeEntry) mark(marker string) error {
 
 type EntryList struct {
 	Entries []TimeEntry
+}
+
+func (el *EntryList) fromICalURL(url string) error {
+	response, err := http.Get(url)
+	if err != nil {
+		return err
+	}
+	defer response.Body.Close()
+
+	fmt.Println(response.Status)
+
+	body, err := os.CreateTemp("", "timewarrior-ical-")
+	_, err = io.Copy(body, response.Body)
+	if err != nil {
+		return err
+	}
+
+	return el.fromICal(body)
+}
+
+func (el *EntryList) fromICal(file *os.File) error {
+	file.Seek(0, 0)
+
+	parser := ics.New()
+	inputChan := parser.GetInputChan()
+	inputChan <- file.Name()
+
+	parser.Wait()
+
+	cal, err := parser.GetCalendars()
+	if err != nil {
+		return err
+	}
+
+	for _, calendar := range cal {
+		location, err := time.LoadLocation("Europe/Berlin")
+		if err != nil {
+			return err
+		}
+		calendar.SetTimezone(*location)
+		// print calendar info
+		fmt.Println(calendar.GetName(), calendar.GetDesc())
+
+		//  get the events for the New Years Eve
+		eventsForDay := calendar.GetEvents()
+		for i, event := range eventsForDay {
+			fmt.Printf("%s %s %s\n", event.GetStartTZID(), event.GetEnd(), event.GetSummary())
+
+			te := TimeEntry{
+				ID:      fmt.Sprintf("ical-%d", i),
+				Start:   event.GetStart(),
+				End:     event.GetEnd(),
+				Hours:   event.GetEnd().Sub(event.GetStart()),
+				Comment: event.GetSummary(),
+			}
+
+			el.Entries = append(el.Entries, te)
+		}
+	}
+
+	return nil
 }
 
 func (el *EntryList) fromTimeWarrior(time_range string) error {

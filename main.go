@@ -1,8 +1,11 @@
 package main
 
 import (
+	"encoding/json"
 	"fmt"
+	"io"
 	"log"
+	"net/http"
 	"os"
 	"strconv"
 
@@ -17,6 +20,23 @@ var (
 	jl JiraLogger
 	rl RedmineLogger
 )
+
+type Detail struct {
+	ActivitySeconds int `json:"activitySeconds"`
+	TotalSeconds    int `json:"totalSeconds"`
+	TimelineProcess struct {
+		ProcessName string `json:"processName"`
+	} `json:"timelineProcess"`
+	TimelineWindow struct {
+		WindowText string `json:"windowText"`
+	} `json:"timelineWindow"`
+}
+type Timeline struct {
+	Details   []Detail `json:"details"`
+	StartTime string   `json:"startTime"`
+}
+
+type Timelines []Timeline
 
 func main() {
 	configFile, err := xdg.ConfigFile("worklogger/config.env")
@@ -35,6 +55,43 @@ func main() {
 		Usage: "A work logger which can log time to Redmine and JIRA.",
 		Flags: []cli.Flag{},
 		Commands: []cli.Command{
+			{
+				Name:  "ical",
+				Usage: "Import time entries from an iCal file.",
+				Flags: []cli.Flag{
+					&cli.StringFlag{
+						Name:  "file",
+						Usage: "The iCal file to import.",
+					},
+				},
+				Action: func(ctx *cli.Context) error {
+					fileName := ctx.String("file")
+
+					// load from url if file is a url
+					if fileName[:4] == "http" {
+						fmt.Println("Importing from iCal URL...")
+						if err := el.fromICalURL(fileName); err != nil {
+							return err
+						}
+					} else {
+						file, err := os.Open(fileName)
+						if err != nil {
+							return err
+						}
+
+						fmt.Println("Importing from iCal file...")
+						fmt.Printf("File: %s\n", fileName)
+						if err := el.fromICal(file); err != nil {
+							return err
+						}
+					}
+
+					table := el.list()
+					table.Render()
+
+					return nil
+				},
+			},
 			{
 				Name:  "list",
 				Usage: "List the time entries from timewarrior.",
@@ -141,6 +198,87 @@ func main() {
 							if issueID == ctx.String("issueID") {
 								entry.mark(ctx.String("tag"))
 							}
+						}
+					}
+
+					return nil
+				},
+			},
+			{
+				Name:  "timeline",
+				Usage: "Shows a timeline of what you used according to TMetric",
+				Flags: []cli.Flag{
+					&cli.StringFlag{
+						Name:  "tmetric-url",
+						Usage: "The URL for TMetric.",
+						Value: os.Getenv("WL_TMETRIC_URL"),
+					},
+					&cli.StringFlag{
+						Name:  "tmetric-api-token",
+						Usage: "The API key for TMetric.",
+						Value: os.Getenv("WL_TMETRIC_API_TOKEN"),
+					},
+					&cli.StringFlag{
+						Name:  "tmetric-accountid",
+						Usage: "The account ID for TMetric.",
+						Value: os.Getenv("WL_TMETRIC_ACCOUNTID"),
+					},
+					&cli.StringFlag{
+						Name:  "tmetric-profileid",
+						Usage: "The profile ID for TMetric.",
+						Value: os.Getenv("WL_TMETRIC_PROFILEID"),
+					},
+				},
+				Action: func(ctx *cli.Context) error {
+					url := ctx.String("tmetric-url")
+					token := ctx.String("tmetric-api-token")
+					profileID := ctx.String("tmetric-profileid")
+					accountID := ctx.String("tmetric-accountid")
+
+					if url == "" || token == "" {
+						log.Println("Please provide a TMetric URL and API token.")
+						return nil
+					}
+
+					url = fmt.Sprintf(
+						"%s/api/timeline/%s?userProfileId=%s&StartTime=%s&EndTime=%s",
+						url,
+						accountID,
+						profileID,
+						"2024-03-01T00:00:00",
+						"2024-03-31T23:59:59",
+					)
+					req, err := http.NewRequest(http.MethodGet, url, nil)
+					if err != nil {
+						return err
+					}
+
+					req.Header.Set("Authorization", "Bearer "+token)
+
+					resp, err := http.DefaultClient.Do(req)
+					if resp.StatusCode != 200 {
+						return fmt.Errorf("Error getting data from TMetric: %d", resp.StatusCode)
+					}
+					if err != nil {
+						return err
+					}
+
+					// read body to string
+					body, err := io.ReadAll(resp.Body)
+					if err != nil {
+						return err
+					}
+
+					var timelines Timelines
+					err = json.Unmarshal(body, &timelines)
+					if err != nil {
+						return err
+					}
+
+					for _, timeline := range timelines {
+						for _, detail := range timeline.Details {
+							log.Printf("%s: %s", timeline.StartTime, detail.TimelineWindow.WindowText)
+							log.Printf("  %s", detail.TimelineProcess.ProcessName)
 						}
 					}
 

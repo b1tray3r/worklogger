@@ -12,6 +12,8 @@ require (
 )
 
 require (
+	github.com/PuloV/ics-golang v0.0.0-20190808201353-a3394d3bcade // indirect
+	github.com/channelmeter/iso8601duration v0.0.0-20150204201828-8da3af7a2a61 // indirect
 	github.com/cpuguy83/go-md2man/v2 v2.0.2 // indirect
 	github.com/fatih/structs v1.1.0 // indirect
 	github.com/golang-jwt/jwt/v4 v4.5.0 // indirect
