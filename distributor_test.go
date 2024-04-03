@@ -1,17 +1,19 @@
 package main
 
 import (
+	"fmt"
 	"testing"
 )
 
 func TestDistributor(t *testing.T) {
 	distributor := Distrubutor{
 		PauseDuration: 1,
-		WorkDuration:  4,
+		WorkDuration:  4.0,
 	}
 
 	te := []TimeEntry{
 		{
+			ID:         "1",
 			Hours:      10,
 			Tags:       []string{"tag1", "tag2"},
 			Comment:    "comment1",
@@ -21,6 +23,7 @@ func TestDistributor(t *testing.T) {
 			IsJira:     false,
 		},
 		{
+			ID:         "2",
 			Hours:      5,
 			Tags:       []string{"tag3", "tag4"},
 			Comment:    "comment2",
@@ -31,12 +34,17 @@ func TestDistributor(t *testing.T) {
 		},
 	}
 
-	result, err := distributor.Distribute(te)
-	if err != nil {
-		t.Errorf("Expected no error, got %s", err)
+	result := distributor.Distribute(te)
+
+	for i, bucket := range result {
+		fmt.Printf("Bucket %d \n", i)
+		for _, entry := range bucket.Entries {
+			fmt.Printf("\t %s - %d\n", entry.Comment, entry.Hours)
+		}
 	}
 
-	if len(result) != 5 {
-		t.Errorf("Expected 3 entries, got %d", len(result))
+	want := 4
+	if len(result) != want {
+		t.Errorf("Expected %d buckets, got %d", want, len(result))
 	}
 }
