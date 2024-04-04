@@ -5,46 +5,198 @@ import (
 	"testing"
 )
 
-func TestDistributor(t *testing.T) {
-	distributor := Distrubutor{
-		PauseDuration: 1,
-		WorkDuration:  4.0,
-	}
-
-	te := []TimeEntry{
-		{
-			ID:         "1",
-			Hours:      10,
-			Tags:       []string{"tag1", "tag2"},
-			Comment:    "comment1",
-			ActivityID: "activity1",
-			errors:     []string{"error1", "error2"},
-			IsRedmine:  false,
-			IsJira:     false,
+func TestDistributorOneBucket(t *testing.T) {
+	tests := map[string]struct {
+		te     []TimeEntry
+		amount int
+	}{
+		"test1": {
+			te: []TimeEntry{
+				{
+					ID:    "1",
+					Hours: 1,
+				},
+			},
+			amount: 1,
 		},
-		{
-			ID:         "2",
-			Hours:      5,
-			Tags:       []string{"tag3", "tag4"},
-			Comment:    "comment2",
-			ActivityID: "activity2",
-			errors:     []string{"error3", "error4"},
-			IsRedmine:  true,
-			IsJira:     true,
+		"test2": {
+			te: []TimeEntry{
+				{
+					ID:    "1",
+					Hours: 2,
+				},
+				{
+					ID:    "2",
+					Hours: 1,
+				},
+			},
+			amount: 1,
+		},
+		"test3": {
+			te: []TimeEntry{
+				{
+					ID:    "1",
+					Hours: 3,
+				},
+				{
+					ID:    "2",
+					Hours: 1,
+				},
+			},
+			amount: 1,
+		},
+		"test4": {
+			te: []TimeEntry{
+				{
+					ID:    "1",
+					Hours: 4,
+				},
+			},
+			amount: 1,
+		},
+		"test5": {
+			te: []TimeEntry{
+				{
+					ID:    "1",
+					Hours: 1,
+				},
+				{
+					ID:    "2",
+					Hours: 1,
+				},
+				{
+					ID:    "3",
+					Hours: 1,
+				},
+				{
+					ID:    "4",
+					Hours: 1,
+				},
+			},
+			amount: 1,
 		},
 	}
 
-	result := distributor.Distribute(te)
+	for name, tc := range tests {
+		t.Run(name, func(t *testing.T) {
+			distributor := Distrubutor{
+				PauseDuration: 1,
+				WorkDuration:  4.0,
+			}
 
-	for i, bucket := range result {
-		fmt.Printf("Bucket %d \n", i)
-		for _, entry := range bucket.Entries {
-			fmt.Printf("\t %s - %d\n", entry.Comment, entry.Hours)
-		}
+			fmt.Println("-------- " + name)
+			result := distributor.Distribute(tc.te)
+
+			for i, bucket := range result {
+				fmt.Printf("Bucket %d\n", i)
+				for _, entry := range bucket.Entries {
+					fmt.Printf("ID: %s, Hours: %f\n", entry.ID, float64(entry.Hours))
+				}
+			}
+
+			if len(result) != tc.amount {
+				t.Errorf("Expected %d buckets, got %d", tc.amount, len(result))
+			}
+		})
+	}
+}
+
+func TestDistributorTwoBucket(t *testing.T) {
+	tests := map[string]struct {
+		te     []TimeEntry
+		amount int
+	}{
+		"test1": {
+			te: []TimeEntry{
+				{
+					ID:    "1",
+					Hours: 5,
+				},
+			},
+			amount: 2,
+		},
+		"test2": {
+			te: []TimeEntry{
+				{
+					ID:    "1",
+					Hours: 4,
+				},
+				{
+					ID:    "2",
+					Hours: 1,
+				},
+			},
+			amount: 2,
+		},
+		"test3": {
+			te: []TimeEntry{
+				{
+					ID:    "1",
+					Hours: 4,
+				},
+				{
+					ID:    "2",
+					Hours: 2,
+				},
+			},
+			amount: 2,
+		},
+		"test4": {
+			te: []TimeEntry{
+				{
+					ID:    "1",
+					Hours: 5,
+				},
+				{
+					ID:    "2",
+					Hours: 2,
+				},
+			},
+			amount: 2,
+		},
+		"test5": {
+			te: []TimeEntry{
+				{
+					ID:    "1",
+					Hours: 1,
+				},
+				{
+					ID:    "2",
+					Hours: 1,
+				},
+				{
+					ID:    "3",
+					Hours: 1,
+				},
+				{
+					ID:    "4",
+					Hours: 2,
+				},
+			},
+			amount: 2,
+		},
 	}
 
-	want := 4
-	if len(result) != want {
-		t.Errorf("Expected %d buckets, got %d", want, len(result))
+	for name, tc := range tests {
+		t.Run(name, func(t *testing.T) {
+			distributor := Distrubutor{
+				PauseDuration: 1,
+				WorkDuration:  4.0,
+			}
+
+			fmt.Println("-------- " + name)
+			result := distributor.Distribute(tc.te)
+
+			for i, bucket := range result {
+				fmt.Printf("Bucket %d\n", i)
+				for _, entry := range bucket.Entries {
+					fmt.Printf("ID: %s, Hours: %f\n", entry.ID, float64(entry.Hours))
+				}
+			}
+
+			if len(result) != tc.amount {
+				t.Errorf("Expected %d buckets, got %d", tc.amount, len(result))
+			}
+		})
 	}
 }

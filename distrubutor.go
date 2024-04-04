@@ -69,28 +69,21 @@ func (d *Distrubutor) split(entries []TimeEntry) []TimeEntry {
 func (d *Distrubutor) Distribute(entries []TimeEntry) []Bucket {
 	te := d.split(entries)
 
-	var currentBucket Bucket
-	for i, entry := range te {
-		if float64(entry.Hours) == float64(d.WorkDuration) {
-			currentBucket.Entries = append(currentBucket.Entries, entry)
-
-			d.Buckets = append(d.Buckets, currentBucket)
-			currentBucket = Bucket{}
-			continue
+	for _, entry := range te {
+		if len(d.Buckets) == 0 {
+			d.Buckets = append(d.Buckets, Bucket{})
 		}
 
-		if currentBucket.TotalHours()+float64(entry.Hours) <= float64(d.WorkDuration) {
-			currentBucket.Entries = append(currentBucket.Entries, entry)
-
-			if i+1 == len(te) {
-				d.Buckets = append(d.Buckets, currentBucket)
-				continue
+		for j, bucket := range d.Buckets {
+			if bucket.TotalHours()+float64(entry.Hours) <= float64(d.WorkDuration) {
+				d.Buckets[j].Entries = append(d.Buckets[j].Entries, entry)
+			} else {
+				bucket := Bucket{
+					Entries: []TimeEntry{entry},
+				}
+				d.Buckets = append(d.Buckets, bucket)
 			}
-		}
-
-		if currentBucket.TotalHours() == float64(d.WorkDuration) {
-			d.Buckets = append(d.Buckets, currentBucket)
-			currentBucket = Bucket{}
+			break
 		}
 	}
 
