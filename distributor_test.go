@@ -5,6 +5,108 @@ import (
 	"testing"
 )
 
+func TestSplit(t *testing.T) {
+	tests := map[string]struct {
+		te     []TimeEntry
+		amount int
+	}{
+		"test1": {
+			te: []TimeEntry{
+				{
+					ID:       "1",
+					Duration: 1.0,
+				},
+			},
+			amount: 1,
+		},
+		"test2": {
+			te: []TimeEntry{
+				{
+					ID:       "2",
+					Duration: 2.0,
+				},
+			},
+			amount: 1,
+		},
+		"test3": {
+			te: []TimeEntry{
+				{
+					ID:       "3",
+					Duration: 3.0,
+				},
+			},
+			amount: 1,
+		},
+		"test4": {
+			te: []TimeEntry{
+				{
+					ID:       "4",
+					Duration: 4.0,
+				},
+			},
+			amount: 1,
+		},
+		"test5": {
+			te: []TimeEntry{
+				{
+					ID:       "5",
+					Duration: 5.0,
+				},
+			},
+			amount: 2,
+		},
+		"test6": {
+			te: []TimeEntry{
+				{
+					ID:       "6",
+					Duration: 6.0,
+				},
+			},
+			amount: 2,
+		},
+		"test7": {
+			te: []TimeEntry{
+				{
+					ID:       "7",
+					Duration: 7.0,
+				},
+			},
+			amount: 2,
+		},
+		"test8": {
+			te: []TimeEntry{
+				{
+					ID:       "8",
+					Duration: 8.0,
+				},
+			},
+			amount: 2,
+		},
+		"test9": {
+			te: []TimeEntry{
+				{
+					ID:       "9",
+					Duration: 9.0,
+				},
+			},
+			amount: 3,
+		},
+	}
+
+	for name, tc := range tests {
+		t.Run(name, func(t *testing.T) {
+			distributor := NewDistributor(3, 1.0, 4.0)
+
+			fmt.Println("Split -------- " + name)
+			result := distributor.Split(tc.te)
+
+			if len(result) != tc.amount {
+				t.Errorf("Total entries should be %d, got %d", tc.amount, len(result))
+			}
+		})
+	}
+}
+
 func TestDistributorOneBucket(t *testing.T) {
 	tests := map[string]struct {
 		te     []TimeEntry
@@ -207,7 +309,7 @@ func TestDistributorTwoBucket(t *testing.T) {
 				t.Skip()
 			}
 
-			distributor := NewDistributor(3, 1, 4)
+			distributor := NewDistributor(3, 1.0, 4.0)
 
 			fmt.Println("TwoBucket -------- " + name)
 			result := distributor.Distribute(tc.te)

@@ -2,6 +2,7 @@ package main
 
 import (
 	"fmt"
+	"math"
 	"sort"
 )
 
@@ -24,11 +25,11 @@ func (b *Bucket) TotalHours() float64 {
 // Distributor is a struct that distributes TimeEntry into Buckets
 type Distributor struct {
 	Buckets       []Bucket
-	PauseDuration int
-	WorkDuration  int
+	PauseDuration float64
+	WorkDuration  float64
 }
 
-func NewDistributor(amountBuckets, pauseDuration, workDuration int) *Distributor {
+func NewDistributor(amountBuckets int, pauseDuration, workDuration float64) *Distributor {
 	distributor := &Distributor{
 		PauseDuration: pauseDuration,
 		WorkDuration:  workDuration,
@@ -42,34 +43,28 @@ func NewDistributor(amountBuckets, pauseDuration, workDuration int) *Distributor
 }
 
 // split will split TimeEntry into smaller TimeEntry with WorkDuration as the maximum hours
-func (d *Distributor) split(entries []TimeEntry) []TimeEntry {
+func (d *Distributor) Split(entries []TimeEntry) []TimeEntry {
 	var result []TimeEntry
 
 	for _, entry := range entries {
-		for float64(entry.Hours) > float64(d.WorkDuration) {
-			result = append(result, TimeEntry{
-				ID:         entry.ID,
-				Duration:   float64(d.WorkDuration),
-				Tags:       entry.Tags,
-				Comment:    entry.Comment,
-				ActivityID: entry.ActivityID,
-				errors:     entry.errors,
-				IsRedmine:  entry.IsRedmine,
-				IsJira:     entry.IsJira,
-			})
+		duration := entry.Duration
 
-			entry.Duration -= float64(d.WorkDuration)
+		n := int(math.Floor(duration / d.WorkDuration))
+		z := math.Mod(duration, d.WorkDuration)
+
+		for i := 0; i < n; i++ {
+			result = append(result, TimeEntry{
+				ID:       entry.ID,
+				Duration: d.WorkDuration,
+			})
 		}
 
-		result = append(result, TimeEntry{
-			Duration:   entry.Duration,
-			Tags:       entry.Tags,
-			Comment:    entry.Comment,
-			ActivityID: entry.ActivityID,
-			errors:     entry.errors,
-			IsRedmine:  entry.IsRedmine,
-			IsJira:     entry.IsJira,
-		})
+		if z > 0 {
+			result = append(result, TimeEntry{
+				ID:       entry.ID,
+				Duration: z,
+			})
+		}
 	}
 
 	// sort result asc by Hours
@@ -81,7 +76,7 @@ func (d *Distributor) split(entries []TimeEntry) []TimeEntry {
 }
 
 func (d *Distributor) Distribute(entries []TimeEntry) []Bucket {
-	te := d.split(entries)
+	te := d.Split(entries)
 
 	fmt.Println("Total Entries: ", len(te))
 
