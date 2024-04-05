@@ -17,6 +17,7 @@ type TimeEntry struct {
 	IssueIDs   []string
 	Start      time.Time
 	End        time.Time
+	Duration   float64
 	Hours      time.Duration
 	Tags       []string
 	Comment    string

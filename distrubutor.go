@@ -1,8 +1,8 @@
 package main
 
 import (
+	"fmt"
 	"sort"
-	"time"
 )
 
 // Bucket is a collection of TimeEntry within a specific time frame
@@ -15,27 +15,41 @@ func (b *Bucket) TotalHours() float64 {
 	var total float64
 
 	for _, entry := range b.Entries {
-		total += float64(entry.Hours)
+		total += float64(entry.Duration)
 	}
 
 	return total
 }
 
-// Distrubutor is a struct that distributes TimeEntry into Buckets
-type Distrubutor struct {
+// Distributor is a struct that distributes TimeEntry into Buckets
+type Distributor struct {
 	Buckets       []Bucket
 	PauseDuration int
 	WorkDuration  int
 }
 
+func NewDistributor(amountBuckets, pauseDuration, workDuration int) *Distributor {
+	distributor := &Distributor{
+		PauseDuration: pauseDuration,
+		WorkDuration:  workDuration,
+	}
+
+	for i := 0; i < amountBuckets; i++ {
+		distributor.Buckets = append(distributor.Buckets, Bucket{})
+	}
+
+	return distributor
+}
+
 // split will split TimeEntry into smaller TimeEntry with WorkDuration as the maximum hours
-func (d *Distrubutor) split(entries []TimeEntry) []TimeEntry {
+func (d *Distributor) split(entries []TimeEntry) []TimeEntry {
 	var result []TimeEntry
 
 	for _, entry := range entries {
 		for float64(entry.Hours) > float64(d.WorkDuration) {
 			result = append(result, TimeEntry{
-				Hours:      time.Duration(d.WorkDuration),
+				ID:         entry.ID,
+				Duration:   float64(d.WorkDuration),
 				Tags:       entry.Tags,
 				Comment:    entry.Comment,
 				ActivityID: entry.ActivityID,
@@ -44,11 +58,11 @@ func (d *Distrubutor) split(entries []TimeEntry) []TimeEntry {
 				IsJira:     entry.IsJira,
 			})
 
-			entry.Hours -= time.Duration(d.WorkDuration)
+			entry.Duration -= float64(d.WorkDuration)
 		}
 
 		result = append(result, TimeEntry{
-			Hours:      entry.Hours,
+			Duration:   entry.Duration,
 			Tags:       entry.Tags,
 			Comment:    entry.Comment,
 			ActivityID: entry.ActivityID,
@@ -60,30 +74,28 @@ func (d *Distrubutor) split(entries []TimeEntry) []TimeEntry {
 
 	// sort result asc by Hours
 	sort.Slice(result, func(i, j int) bool {
-		return result[i].Hours > result[j].Hours
+		return result[i].Duration > result[j].Duration
 	})
 
 	return result
 }
 
-func (d *Distrubutor) Distribute(entries []TimeEntry) []Bucket {
+func (d *Distributor) Distribute(entries []TimeEntry) []Bucket {
 	te := d.split(entries)
 
-	for _, entry := range te {
-		if len(d.Buckets) == 0 {
-			d.Buckets = append(d.Buckets, Bucket{})
-		}
+	fmt.Println("Total Entries: ", len(te))
 
-		for j, bucket := range d.Buckets {
-			if bucket.TotalHours()+float64(entry.Hours) <= float64(d.WorkDuration) {
-				d.Buckets[j].Entries = append(d.Buckets[j].Entries, entry)
-			} else {
-				bucket := Bucket{
-					Entries: []TimeEntry{entry},
-				}
-				d.Buckets = append(d.Buckets, bucket)
+	if len(te) == 0 {
+		return d.Buckets
+	}
+
+	for i, bucket := range d.Buckets {
+		for _, entry := range te {
+			if bucket.TotalHours()+entry.Duration <= float64(d.WorkDuration) {
+				bucket.Entries = append(bucket.Entries, entry)
+				d.Buckets[i] = bucket
+				te = te[1:]
 			}
-			break
 		}
 	}
 

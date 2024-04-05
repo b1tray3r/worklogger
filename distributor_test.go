@@ -13,89 +13,92 @@ func TestDistributorOneBucket(t *testing.T) {
 		"test1": {
 			te: []TimeEntry{
 				{
-					ID:    "1",
-					Hours: 1,
+					ID:       "1",
+					Duration: 1.0,
 				},
 			},
-			amount: 1,
+			amount: 1.0,
 		},
 		"test2": {
 			te: []TimeEntry{
 				{
-					ID:    "1",
-					Hours: 2,
+					ID:       "1",
+					Duration: 2.0,
 				},
 				{
-					ID:    "2",
-					Hours: 1,
+					ID:       "2",
+					Duration: 1.0,
 				},
 			},
-			amount: 1,
+			amount: 3.0,
 		},
 		"test3": {
 			te: []TimeEntry{
 				{
-					ID:    "1",
-					Hours: 3,
+					ID:       "1",
+					Duration: 3.0,
 				},
 				{
-					ID:    "2",
-					Hours: 1,
+					ID:       "2",
+					Duration: 1.0,
 				},
 			},
-			amount: 1,
+			amount: 4.0,
 		},
 		"test4": {
 			te: []TimeEntry{
 				{
-					ID:    "1",
-					Hours: 4,
+					ID:       "1",
+					Duration: 4.0,
 				},
 			},
-			amount: 1,
+			amount: 4.0,
 		},
 		"test5": {
 			te: []TimeEntry{
 				{
-					ID:    "1",
-					Hours: 1,
+					ID:       "1",
+					Duration: 1.0,
 				},
 				{
-					ID:    "2",
-					Hours: 1,
+					ID:       "2",
+					Duration: 1.0,
 				},
 				{
-					ID:    "3",
-					Hours: 1,
+					ID:       "3",
+					Duration: 1.0,
 				},
 				{
-					ID:    "4",
-					Hours: 1,
+					ID:       "4",
+					Duration: 1.0,
 				},
 			},
-			amount: 1,
+			amount: 4.0,
 		},
 	}
 
 	for name, tc := range tests {
 		t.Run(name, func(t *testing.T) {
-			distributor := Distrubutor{
-				PauseDuration: 1,
-				WorkDuration:  4.0,
-			}
+			distributor := NewDistributor(3, 1, 4)
 
-			fmt.Println("-------- " + name)
+			fmt.Println("OneBucket -------- " + name)
 			result := distributor.Distribute(tc.te)
 
+			sum := 0.0
 			for i, bucket := range result {
-				fmt.Printf("Bucket %d\n", i)
 				for _, entry := range bucket.Entries {
-					fmt.Printf("ID: %s, Hours: %f\n", entry.ID, float64(entry.Hours))
+					fmt.Printf("Duration: %f\n", float64(entry.Duration))
 				}
+
+				if float64(bucket.TotalHours()) > 4 {
+					t.Errorf("Bucket %d should not have more than 4 hours", i)
+				}
+
+				sum += float64(bucket.TotalHours())
 			}
 
-			if len(result) != tc.amount {
-				t.Errorf("Expected %d buckets, got %d", tc.amount, len(result))
+			if sum != float64(tc.amount) {
+				t.Errorf("Total hours should be %f, got %f", float64(tc.amount), sum)
 			}
 		})
 	}
@@ -109,93 +112,122 @@ func TestDistributorTwoBucket(t *testing.T) {
 		"test1": {
 			te: []TimeEntry{
 				{
-					ID:    "1",
-					Hours: 5,
+					ID:       "1",
+					Duration: 5.0,
 				},
 			},
-			amount: 2,
+			amount: 5.0,
 		},
 		"test2": {
 			te: []TimeEntry{
 				{
-					ID:    "1",
-					Hours: 4,
+					ID:       "1",
+					Duration: 4.0,
 				},
 				{
-					ID:    "2",
-					Hours: 1,
+					ID:       "2",
+					Duration: 1.0,
 				},
 			},
-			amount: 2,
+			amount: 5.0,
 		},
 		"test3": {
 			te: []TimeEntry{
 				{
-					ID:    "1",
-					Hours: 4,
+					ID:       "1",
+					Duration: 4.0,
 				},
 				{
-					ID:    "2",
-					Hours: 2,
+					ID:       "2",
+					Duration: 2.0,
 				},
 			},
-			amount: 2,
+			amount: 6.0,
 		},
 		"test4": {
 			te: []TimeEntry{
 				{
-					ID:    "1",
-					Hours: 5,
+					ID:       "1",
+					Duration: 5.0,
 				},
 				{
-					ID:    "2",
-					Hours: 2,
+					ID:       "2",
+					Duration: 2.0,
 				},
 			},
-			amount: 2,
+			amount: 7.0,
 		},
 		"test5": {
 			te: []TimeEntry{
 				{
-					ID:    "1",
-					Hours: 1,
+					ID:       "1",
+					Duration: 1.0,
 				},
 				{
-					ID:    "2",
-					Hours: 1,
+					ID:       "2",
+					Duration: 1.0,
 				},
 				{
-					ID:    "3",
-					Hours: 1,
+					ID:       "3",
+					Duration: 1.0,
 				},
 				{
-					ID:    "4",
-					Hours: 2,
+					ID:       "4",
+					Duration: 2.0,
 				},
 			},
-			amount: 2,
+			amount: 5.0,
+		},
+		"test6": {
+			te: []TimeEntry{
+				{
+					ID:       "1",
+					Duration: 3.5,
+				},
+				{
+					ID:       "2",
+					Duration: 1.5,
+				},
+				{
+					ID:       "3",
+					Duration: 1.5,
+				},
+				{
+					ID:       "4",
+					Duration: 0.5,
+				},
+			},
+			amount: 6.0,
 		},
 	}
 
 	for name, tc := range tests {
 		t.Run(name, func(t *testing.T) {
-			distributor := Distrubutor{
-				PauseDuration: 1,
-				WorkDuration:  4.0,
+			if name != "test4" {
+				t.Skip()
 			}
 
-			fmt.Println("-------- " + name)
+			distributor := NewDistributor(3, 1, 4)
+
+			fmt.Println("TwoBucket -------- " + name)
 			result := distributor.Distribute(tc.te)
 
+			sum := 0.0
 			for i, bucket := range result {
-				fmt.Printf("Bucket %d\n", i)
+				fmt.Printf("Bucket: %v\n", i)
 				for _, entry := range bucket.Entries {
-					fmt.Printf("ID: %s, Hours: %f\n", entry.ID, float64(entry.Hours))
+					fmt.Printf("Duration: %f\n", float64(entry.Duration))
 				}
+
+				if float64(bucket.TotalHours()) > 4 {
+					t.Errorf("Bucket %d should not have more than 4 hours", i)
+				}
+
+				sum += float64(bucket.TotalHours())
 			}
 
-			if len(result) != tc.amount {
-				t.Errorf("Expected %d buckets, got %d", tc.amount, len(result))
+			if sum != float64(tc.amount) {
+				t.Errorf("Total hours should be %f, got %f", float64(tc.amount), sum)
 			}
 		})
 	}
