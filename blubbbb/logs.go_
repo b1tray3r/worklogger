@@ -1,0 +1,55 @@
+package database
+
+import (
+	"fmt"
+
+	"github.com/b1tray3r/worklogger/internal/api"
+)
+
+type Logs struct {
+	db      *Database
+	entries []*api.Log
+}
+
+func NewLogs(db *Database) *Logs {
+	entries, err := db.db.Query("SELECT * FROM logs;")
+	if err != nil {
+		fmt.Println("Error selecting logs: ", err)
+	}
+
+	logs := make([]*api.Log, 0)
+	for entries.Next() {
+		log := &api.Log{}
+		err := entries.Scan(&log.ID, &log.Logday, &log.Duration, &log.Message, &log.State)
+		if err != nil {
+			fmt.Println("Error scanning logs: ", err)
+		}
+		logs = append(logs, log)
+	}
+
+	return &Logs{
+		db:      db,
+		entries: logs,
+	}
+}
+
+func (t *Logs) Add(log *api.Log) (*api.Log, error) {
+	result, err := t.db.db.Exec("INSERT INTO logs (logday, duration, message, state) VALUES (?, ?, ?, ?);", log.Logday, log.Duration, log.Message, log.State)
+	if err != nil {
+		return nil, fmt.Errorf("error inserting log: %v", err)
+	}
+
+	id, err := result.LastInsertId()
+	if err != nil {
+		return nil, fmt.Errorf("error getting last insert id: %v", err)
+	}
+
+	log.ID = id
+	t.entries = append(t.entries, log)
+
+	return log, err
+}
+
+func (t *Logs) List() []*api.Log {
+	return t.entries
+}

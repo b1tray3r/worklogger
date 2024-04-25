@@ -1,14 +1,25 @@
-# JIRA/Redmine Worklogger
+# Worklogger
 
-This tool is able to sync time entries to [Redmine](https://www.redmine.org/) and [JIRA](https://www.atlassian.com/) trackers.
-The time entries are currently maintained in [timewarrior](https://timewarrior.net/).
+Worklogger is a simple command line tool to log your work hours.
+It is designed to be simple and easy to use.
 
-## TODOs
 
-- Compatibility with CSV
-- dry-run
-- refactoring
+```mermaid
+  %%{ "theme": "dark" }%%
+  classDiagram
+    class Tags {
+        +int ID
+        +string Name
+        +string Value
+    }
 
-## Requirements
+    class Log {
+        +int ID
+        +date Date
+        +float Duration
+        +string Message
+        +tag tagID
+    }
 
-- timew (timewarrior)
+    Log -- Tags
+```

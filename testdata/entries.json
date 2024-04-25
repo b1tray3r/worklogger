@@ -1,6 +1,0 @@
-[
-{"id":4,"start":"20240203T192106Z","end":"20240203T192226Z","tags":["first entry","test", "J-PIM-12345"]},
-{"id":3,"start":"20240203T192236Z","end":"20240203T192421Z","tags":["first entry","test", "J-PIM-67890", "R-67890"]},
-{"id":2,"start":"20240203T192432Z","end":"20240203T192453Z","tags":["first entry","test", "R-90909"]},
-{"id":1,"start":"20240203T192835Z","end":"20240203T193058Z","tags":["second test", "R-12345","test"]}
-]

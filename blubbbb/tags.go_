@@ -1,0 +1,62 @@
+package database
+
+import (
+	"fmt"
+
+	"github.com/b1tray3r/worklogger/internal/api"
+)
+
+type Tags struct {
+	db      *Database
+	entries []*api.Tag
+}
+
+func NewTags(db *Database) *Tags {
+	entries, err := db.db.Query("SELECT * FROM tags;")
+	if err != nil {
+		fmt.Println("Error selecting tags: ", err)
+	}
+
+	tags := make([]*api.Tag, 0)
+	for entries.Next() {
+		tag := &api.Tag{}
+		err := entries.Scan(&tag.ID, &tag.Name, &tag.Value)
+		if err != nil {
+			fmt.Println("Error scanning tags: ", err)
+		}
+		tags = append(tags, tag)
+	}
+
+	return &Tags{
+		db:      db,
+		entries: tags,
+	}
+}
+
+func (t *Tags) Add(name, value string) (*api.Tag, error) {
+	tags := t.db.db.QueryRow(:, name, value)
+
+	fmt.Printf("tags: %v\n", tags)
+
+	result, err := t.db.db.Exec("INSERT INTO tags (name, value) VALUES (?, ?)", name, value)
+	if err != nil {
+		return nil, fmt.Errorf("error inserting tag: %#v", err)
+	}
+
+	tag := &api.Tag{
+		Name:  name,
+		Value: value,
+	}
+
+	tag.ID, err = result.LastInsertId()
+	if err != nil {
+		return nil, fmt.Errorf("error getting last insert ID: %#v", err)
+	}
+
+	t.entries = append(t.entries, tag)
+	return tag, nil
+}
+
+func (t *Tags) List() []*api.Tag {
+	return t.entries
+}

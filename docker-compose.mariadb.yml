@@ -1,0 +1,14 @@
+volumes:
+  data:
+services:
+  db:
+    image: mariadb
+    environment:
+      MYSQL_ROOT_PASSWORD: rootpassword
+      MYSQL_DATABASE: worklogger
+      MYSQL_USER: notroot
+      MYSQL_PASSWORD: notrootpassword
+    volumes:
+      - data:/var/lib/mysql
+    ports:
+      - "3306:3306"
