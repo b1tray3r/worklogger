@@ -112,3 +112,28 @@ func (w *Worklogger) AddLog(message string, tags []string) error {
 	defer w.database.Close()
 	return nil
 }
+
+func (w *Worklogger) ListTags() ([]*Tag, error) {
+	if err := w.database.Connect(); err != nil {
+		return nil, fmt.Errorf("error connecting to database: %v", err)
+	}
+	defer w.database.Close()
+
+	rows, err := w.database.driver.Query("SELECT * FROM tags;")
+	if err != nil {
+		return nil, fmt.Errorf("error listing tags: %v", err)
+	}
+	defer rows.Close()
+
+	tags := []*Tag{}
+	for rows.Next() {
+		tag := &Tag{}
+		err := rows.Scan(&tag.ID, &tag.Name, &tag.Value)
+		if err != nil {
+			return nil, fmt.Errorf("error scanning tag: %v", err)
+		}
+		tags = append(tags, tag)
+	}
+
+	return tags, nil
+}
